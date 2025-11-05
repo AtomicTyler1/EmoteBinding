@@ -1,5 +1,6 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
+using BepInEx.Bootstrap;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -9,33 +10,158 @@ using PEAKEmoteLib;
 
 namespace EmoteBinding
 {
-    [BepInPlugin("com.atomic.emotebinding", "Emote Binding", "1.0.1")]
-    [BepInDependency("com.github.WaporVave.PEAKEmoteLib")]
+    [BepInPlugin("com.atomic.emotebinding", "Emote Binding", "1.1.0")]
+    [BepInDependency("com.github.WaporVave.PEAKEmoteLib", BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
         public static Plugin instance;
+
         public static Dictionary<string, ConfigEntry<KeyCode>> EmoteBindings = new();
         public static Dictionary<string, EmoteWheelData> EmoteData = new();
 
         private static Type emoteRegistryType;
         private static MethodInfo getEmotesMethod;
 
+        private bool baseEmotesRegistered = false;
         private bool customEmotesRegistered = false;
 
         private static readonly MethodInfo playEmoteMethod = AccessTools.Method(typeof(CharacterAnimations), "PlayEmote");
 
+        private static readonly KeyCode[] DefaultKeySequence = new KeyCode[]
+        {
+            KeyCode.Alpha5, KeyCode.Alpha6, KeyCode.Alpha7, KeyCode.Alpha8,
+            KeyCode.Alpha9, KeyCode.Alpha0, KeyCode.Minus, KeyCode.Equals
+        };
+
         private void Awake()
         {
             instance = this;
+            if (Chainloader.PluginInfos.ContainsKey("com.github.WaporVave.PEAKEmoteLib"))
+            {
+                SetupEmoteRegistryReflection();
+            }
+            else
+            {
+                customEmotesRegistered = true;
+            }
 
-            SetupEmoteRegistryReflection();
-            RegisterDefaultEmotes();
-            RegisterCustomEmotes();
+            PatchEmoteWheel();
 
             var harmony = new Harmony("com.atomic.emotebinding");
-            harmony.PatchAll();
+            harmony.PatchAll(Assembly.GetExecutingAssembly());
         }
 
+        #region Base Game Emotes (Do Not Change)
+        private void PatchEmoteWheel()
+        {
+            var emoteWheelType = AccessTools.TypeByName("EmoteWheel");
+            if (emoteWheelType != null)
+            {
+                var awake = AccessTools.Method(emoteWheelType, "Awake", new Type[0]);
+                var start = AccessTools.Method(emoteWheelType, "Start", new Type[0]);
+                var onEnable = AccessTools.Method(emoteWheelType, "OnEnable", new Type[0]);
+                var targetMethod = awake ?? start ?? onEnable;
+
+                if (targetMethod != null)
+                {
+                    var harmony = new Harmony("com.atomic.emotebinding");
+                    harmony.Patch(targetMethod, prefix: new HarmonyMethod(typeof(Plugin), nameof(EmoteWheel_Init_Prefix)));
+                    Logger.LogInfo($"Successfully patched {targetMethod.Name} for dynamic base emote discovery.");
+                }
+                else
+                {
+                    Logger.LogError("No Awake/Start/OnEnable found on EmoteWheel. Using fallback.");
+                    RegisterDefaultEmotesFallback();
+                }
+            }
+            else
+            {
+                Logger.LogError("Could not find type 'EmoteWheel'. Using fallback.");
+                RegisterDefaultEmotesFallback();
+            }
+        }
+
+        private static void EmoteWheel_Init_Prefix(object __instance)
+        {
+            if (instance == null || instance.baseEmotesRegistered) return;
+
+            var dataField = __instance.GetType().GetField("data", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (dataField == null)
+            {
+                instance.Logger.LogError("EmoteWheel 'data' field not found.");
+                instance.RegisterDefaultEmotesFallback();
+                return;
+            }
+
+            var emoteDataList = dataField.GetValue(__instance) as System.Collections.IList;
+            if (emoteDataList == null)
+            {
+                instance.Logger.LogError("EmoteWheel 'data' invalid or null.");
+                instance.RegisterDefaultEmotesFallback();
+                return;
+            }
+
+            int nextDefaultKeyIndex = 0;
+            foreach (var emoteDataObject in emoteDataList)
+            {
+                if (emoteDataObject == null) continue;
+
+                var emoteDataType = emoteDataObject.GetType();
+                var emoteNameField = emoteDataType.GetField("emoteName", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                var animField = emoteDataType.GetField("anim", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                var emoteName = emoteNameField?.GetValue(emoteDataObject) as string;
+                var animName = animField?.GetValue(emoteDataObject) as string;
+
+                if (string.IsNullOrEmpty(emoteName) || string.IsNullOrEmpty(animName)) continue;
+
+                if (!EmoteBindings.ContainsKey(emoteName))
+                {
+                    KeyCode defaultKey = KeyCode.None;
+                    if (nextDefaultKeyIndex < DefaultKeySequence.Length)
+                    {
+                        defaultKey = DefaultKeySequence[nextDefaultKeyIndex];
+                        nextDefaultKeyIndex++;
+                    }
+                    instance.RegisterBaseEmoteBinding("Base Game Emotes (Dynamic)", defaultKey, emoteName, animName);
+                }
+            }
+
+            instance.baseEmotesRegistered = true;
+        }
+
+        private void RegisterDefaultEmotesFallback()
+        {
+            if (baseEmotesRegistered) return;
+
+            const string section = "Default Emotes (Fallback)";
+            RegisterBaseEmoteBinding(section, KeyCode.Alpha5, "Thumbs Up", "A_Scout_Emote_ThumbsUp");
+            RegisterBaseEmoteBinding(section, KeyCode.Alpha6, "Think", "A_Scout_Emote_Think");
+            RegisterBaseEmoteBinding(section, KeyCode.Alpha7, "No-No", "A_Scout_Emote_Nono");
+            RegisterBaseEmoteBinding(section, KeyCode.Alpha8, "Play Dead", "A_Scout_Emote_Flex");
+            RegisterBaseEmoteBinding(section, KeyCode.Alpha9, "Shrug", "A_Scout_Emote_Shrug");
+            RegisterBaseEmoteBinding(section, KeyCode.Alpha0, "Crossed Arms", "A_Scout_Emote_CrossedArms");
+            RegisterBaseEmoteBinding(section, KeyCode.Minus, "Dance", "A_Scout_Emote_Dance1");
+            RegisterBaseEmoteBinding(section, KeyCode.Equals, "Salute", "A_Scout_Emote_Salute");
+
+            baseEmotesRegistered = true;
+            Logger.LogWarning("Dynamic discovery failed. Using hardcoded emote list.");
+        }
+
+        private void RegisterBaseEmoteBinding(string section, KeyCode defaultKeycode, string emoteName, string animName)
+        {
+            var entry = Config.Bind(section, emoteName, defaultKeycode, $"Key binding for emote: {emoteName}");
+            EmoteBindings[emoteName] = entry;
+
+            var emoteData = ScriptableObject.CreateInstance<EmoteWheelData>();
+            emoteData.emoteName = emoteName;
+            emoteData.anim = animName;
+
+            EmoteData[emoteName] = emoteData;
+        }
+        #endregion
+
+        #region Custom Emotes (Deferred Registration)
         private void SetupEmoteRegistryReflection()
         {
             try
@@ -66,6 +192,52 @@ namespace EmoteBinding
             }
         }
 
+        private void RegisterCustomEmotes()
+        {
+            if (getEmotesMethod == null || customEmotesRegistered) return;
+
+            const string section = "Custom Emotes";
+
+            var customEmotes = getEmotesMethod.Invoke(null, null) as IReadOnlyDictionary<string, Emote>;
+            if (customEmotes == null)
+            {
+                if (customEmotesRegistered)
+                    Logger.LogError("Failed to invoke EmoteRegistry.GetEmotes() via reflection.");
+                return;
+            }
+
+            int count = 0;
+            foreach (var emotePair in customEmotes)
+            {
+                var emote = emotePair.Value;
+                if (emote == null) continue;
+
+                string bindingName = emote.Name;
+                string animName = emote.Name;
+                if (string.IsNullOrEmpty(bindingName)) continue;
+                if (EmoteBindings.ContainsKey(bindingName)) continue;
+
+                var entry = Config.Bind(section, bindingName, KeyCode.None, $"Key binding for emote: {bindingName}");
+                EmoteBindings[bindingName] = entry;
+
+                var emoteData = ScriptableObject.CreateInstance<EmoteWheelData>();
+                emoteData.emoteName = bindingName;
+                emoteData.anim = animName;
+                EmoteData[bindingName] = emoteData;
+
+                count++;
+            }
+
+            if (count > 0)
+                Logger.LogInfo($"Registered {count} custom emotes into Config and EmoteWheel.");
+
+            if (customEmotes.Count > 0)
+            {
+                customEmotesRegistered = true;
+            }
+        }
+        #endregion
+
         private void Update()
         {
             if (!customEmotesRegistered)
@@ -78,19 +250,13 @@ namespace EmoteBinding
 
             foreach (var binding in EmoteBindings)
             {
-                if (binding.Value.Value == KeyCode.None)
-                    continue;
+                if (binding.Value.Value == KeyCode.None) continue;
 
                 if (Input.GetKeyDown(binding.Value.Value))
                 {
                     if (EmoteData.TryGetValue(binding.Key, out var emoteData))
                     {
-                        Logger.LogInfo($"Playing emote: {emoteData.emoteName} ({emoteData.anim})");
                         TryPlayEmote(emoteData.anim);
-                    }
-                    else
-                    {
-                        Logger.LogWarning($"No EmoteData found for {binding.Key}");
                     }
                 }
             }
@@ -98,8 +264,7 @@ namespace EmoteBinding
 
         public static void TryPlayEmote(string emoteName)
         {
-            if (Character.localCharacter?.refs?.animations == null)
-                return;
+            if (Character.localCharacter?.refs?.animations == null) return;
 
             var anims = Character.localCharacter.refs.animations;
             if (playEmoteMethod == null)
@@ -109,82 +274,6 @@ namespace EmoteBinding
             }
 
             playEmoteMethod.Invoke(anims, new object[] { emoteName });
-        }
-
-        private void RegisterEmoteBinding(string section, KeyCode defaultKeycode, string emoteName, string animName)
-        {
-            // 1. Register/Bind Config
-            var entry = Config.Bind(
-                section,
-                emoteName,
-                defaultKeycode,
-                $"Key binding for emote: {emoteName}"
-            );
-
-            EmoteBindings[emoteName] = entry;
-
-            var emoteData = ScriptableObject.CreateInstance<EmoteWheelData>();
-            emoteData.emoteName = emoteName;
-            emoteData.anim = animName;
-
-            EmoteData[emoteName] = emoteData;
-        }
-
-        private void RegisterDefaultEmotes()
-        {
-            const string section = "Default Emotes";
-
-            RegisterEmoteBinding(section, KeyCode.Alpha5, "Thumbs Up", "A_Scout_Emote_ThumbsUp");
-            RegisterEmoteBinding(section, KeyCode.Alpha6, "Think", "A_Scout_Emote_Think");
-            RegisterEmoteBinding(section, KeyCode.Alpha7, "No-No", "A_Scout_Emote_Nono");
-            RegisterEmoteBinding(section, KeyCode.Alpha8, "Play Dead", "A_Scout_Emote_Flex");
-            RegisterEmoteBinding(section, KeyCode.Alpha9, "Shrug", "A_Scout_Emote_Shrug");
-            RegisterEmoteBinding(section, KeyCode.Alpha0, "Crossed Arms", "A_Scout_Emote_CrossedArms");
-            RegisterEmoteBinding(section, KeyCode.Minus, "Dance", "A_Scout_Emote_Dance1");
-            RegisterEmoteBinding(section, KeyCode.Equals, "Salute", "A_Scout_Emote_Salute");
-        }
-
-        private void RegisterCustomEmotes()
-        {
-            if (getEmotesMethod == null)
-            {
-                return;
-            }
-
-            const string section = "Custom Emotes";
-
-            var customEmotes = getEmotesMethod.Invoke(null, null) as IReadOnlyDictionary<string, Emote>;
-
-            if (customEmotes == null)
-            {
-                Logger.LogError("Failed to invoke EmoteRegistry.GetEmotes() via reflection.");
-                return;
-            }
-
-            int count = 0;
-
-            foreach (var emotePair in customEmotes)
-            {
-                var emote = emotePair.Value;
-
-                string bindingName = emote.Name;
-                string animName = emote.Name;
-                if (EmoteBindings.ContainsKey(bindingName))
-                    continue;
-
-                RegisterEmoteBinding(section, KeyCode.None, bindingName, animName);
-                count++;
-            }
-
-            if (count > 0)
-            {
-                Logger.LogInfo($"Registered {count} new custom emote bindings from PEAKEmoteLib.");
-            }
-
-            if (customEmotes.Count > 0)
-            {
-                customEmotesRegistered = true;
-            }
         }
     }
 }

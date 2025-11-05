@@ -6,15 +6,12 @@ This mod lets you set a keybind to an emote via a config.
 
 This mod also has full support for custom emotes! However, **custom emotes are set to no keybind on default**.
 
-## Default values:
-Thumbs Up: Number 5
-Think: Number 6
-No-No: Number 7
-Play Dead: Number 8
-Shrug: Number 9
-Crossed Arms: Number 0
-Dance: Minus (-)
-Salute: Equals (=)
+## How to config base game emotes
+
+First start by launching the game with the mod installed, going to the Airport and then pressing R.
+This will generate a config with the latest base game emotes.
+
+Then, navigate to your BepInEx folder, then Bepinex/config, and open `com.atomic.emotebinding.cfg` in notepad or what's preferred. Refer to the part below for more steps.
 
 Any custom emote: None (Unbound)
 

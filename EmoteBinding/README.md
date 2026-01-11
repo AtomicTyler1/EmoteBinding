@@ -8,10 +8,8 @@ This mod also has full support for custom emotes! However, **custom emotes are s
 
 ## How to config base game emotes
 
-First start by launching the game with the mod installed, going to the Airport and then pressing R.
-This will generate a config with the latest base game emotes.
-
-Then, navigate to your BepInEx folder, then Bepinex/config, and open `com.atomic.emotebinding.cfg` in notepad or what's preferred. Refer to the part below for more steps.
+Bweefore you would need to open the emote wheel once, that bug has since been fixed, although you may still need to go into the airport once for any new emotes.
+Navigate to your BepInEx folder, then Bepinex/config, and open `com.atomic.emotebinding.cfg` in notepad or what's preferred. Refer to the part below for more steps.
 
 Any custom emote: None (Unbound)
 
@@ -35,4 +33,4 @@ Option 3: Manually
 3. Open `com.atomic.emotebinding.cfg` in notepad or what's preferred
 4. Change the emote button!
 
-(Note option 3 is not as good as option 1 and 2).
+(Note option 3 is not as good as option 1 and 2, it is always recommended you use a mod manager before asking for support).

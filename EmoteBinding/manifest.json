@@ -1,8 +1,8 @@
 {
     "name": "Emote_Binding",
-    "version_number": "1.1.0",
+    "version_number": "1.2.0",
     "website_url": "https://atomictyler.dev",
-    "description": "CUSTOM EMOTE SUPPORT - Bind emotes to a keybind",
+    "description": "CUSTOM EMOTE SUPPORT - Bind emotes to a keybind!",
     "dependencies": [
         "BepInEx-BepInExPack_PEAK-5.4.75301"
     ]

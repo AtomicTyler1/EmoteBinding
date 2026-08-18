@@ -152,11 +152,14 @@ namespace EmoteBinding
 
             foreach (var binding in EmoteBindings)
             {
-                if (binding.Value.Value != KeyCode.None && Input.GetKeyDown(binding.Value.Value))
+                if (GUIManager.instance != null && !GUIManager.instance.windowBlockingInput)
                 {
-                    if (EmoteData.TryGetValue(binding.Key, out var data))
+                    if (binding.Value.Value != KeyCode.None && Input.GetKeyDown(binding.Value.Value))
                     {
-                        TryPlayEmote(data.anim);
+                        if (EmoteData.TryGetValue(binding.Key, out var data))
+                        {
+                            TryPlayEmote(data.anim);
+                        }
                     }
                 }
             }

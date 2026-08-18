@@ -1,6 +1,6 @@
 {
     "name": "Emote_Binding",
-    "version_number": "1.2.0",
+    "version_number": "1.3.0",
     "website_url": "https://atomictyler.dev",
     "description": "CUSTOM EMOTE SUPPORT - Bind emotes to a keybind!",
     "dependencies": [

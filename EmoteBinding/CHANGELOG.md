@@ -1,8 +1,16 @@
 <details>
+<summary> v1.3.0 - Text Chat Support </summary>
+
+- When typing in chat with a text chat mod, you will no longer do emotes.
+- This includes doing anything in other UI.
+
+</details>
+
+<details>
 <summary> v1.2.0 - Big Fix </summary>
 
 - You no longer have to open the emote wheel to initilize anything.
-- JUst get straight into emote binding! It is recommended you use [ModConfig](https://thunderstore.io/c/peak/p/AtomicStudio/Emote_Binding/)
+- Just get straight into emote binding! It is recommended you use [ModConfig](https://thunderstore.io/c/peak/p/AtomicStudio/Emote_Binding/)
 
 </details>
 

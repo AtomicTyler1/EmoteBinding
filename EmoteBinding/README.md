@@ -5,6 +5,7 @@ This mod lets you set a keybind to an emote via a config.
 > Note: It is recommend you use [ModConfig](https://thunderstore.io/c/peak/p/PEAKModding/ModConfig) to edit the keybinds directly in game!
 
 This mod also has full support for custom emotes! However, **custom emotes are set to no keybind on default**.
+You now no longer do an emote when typing in text chat or using other UI!
 
 ## How to config base game emotes
 

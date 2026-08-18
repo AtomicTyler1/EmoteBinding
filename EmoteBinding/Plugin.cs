@@ -10,7 +10,11 @@ using PEAKEmoteLib;
 
 namespace EmoteBinding
 {
-    [BepInPlugin("com.atomic.emotebinding", "Emote Binding", "1.1.0")]
+
+    // This plugin was not made with a template, so sorry to any developers trying to work on this lol.
+    // Also doesnt use a publicizer, so uses some reflection. Again, old code.
+
+    [BepInPlugin("com.atomic.emotebinding", "Emote Binding", "1.3.0")]
     [BepInDependency("com.github.WaporVave.PEAKEmoteLib", BepInDependency.DependencyFlags.SoftDependency)]
     public class Plugin : BaseUnityPlugin
     {
